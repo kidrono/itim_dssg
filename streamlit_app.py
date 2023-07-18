@@ -5,15 +5,27 @@ import plotly.express as px
 
 st.set_page_config(page_title="ITIM", page_icon=":computer:", layout="wide")
 df = pd.read_csv("files_with_date.csv")
+df_freq = pd.read_csv("for_romy.csv")
+df_freq = df_freq.drop(columns=['Id'])
+df_freq[df_freq > 1] = 1
+zeros_count = df_freq.eq(0).sum().sum()
+ones_count = df_freq.eq(1).sum().sum()
+
+# Create a pie chart
+fig_freq = px.pie(
+    values=[zeros_count, ones_count],
+    names=['Not Sampled', 'Sampled'],
+    title='Monthly sampling frequency',
+)
+
+
 
 with st.container():
-    st.title("ITIM")
-    st.write("ITIM is a tool to help you manage your time. It is based on the Eisenhower Matrix, which categorizes tasks based on their urgency and importance. The matrix is divided into four quadrants, which are labeled as follows:")
-    st.write("1. Important and Urgent")
-    st.write("2. Important and Not Urgent")
-    st.write("3. Not Important and Urgent")
-    st.write("4. Not Important and Not Urgent")
-    st.write("The goal of ITIM is to help you prioritize your tasks and manage your time more effectively. To get started, enter your tasks in the table below. Then, click the 'Submit' button to see your tasks organized by quadrant.")
+    st.title("Mikveh Data Analysis for ITIM")
+    st.write("[ITIM](https://www.itim.org.il/) is the leading advocacy organization working to build a Jewish and democratic Israel in which all Jews can lead full Jewish lives.")
+    st.write("On this Dashboard, we analyze data from the the Health Ministry montly Mikveh samples to help ITIM find the mikvaot that are not sampled enough or have invalid data.")
+    st.write("This project has been developed by the Data Science for Social Good program at the Hebrew University of Jerusalem.")
+    st.write("Project Members: Romy Bauch, Oshri Fatkiev, Gili Kurtser-Gilead, and Omer Kidron")
     # upload new csv file
     uploaded_file = st.file_uploader("Upload a new csv file to update the data.")
     if uploaded_file is not None:
@@ -29,7 +41,7 @@ invalid = ((df['Chlorine'].lt(1.5) | df['Chlorine'].gt(3)) | (df['Coliforms'].gt
 df['Invalid'] = invalid
 df['Date'] = pd.to_datetime(df['Date'])
 # make pie chart of invalid data
-fig = px.pie(df, names='Invalid')
+fig = px.pie(df, names='Invalid', title='Invalid data by all years')
 # fig.update_traces(textposition='inside', textinfo='percent+label')
 fig.update_layout(uniformtext_minsize=12, uniformtext_mode='hide')
 
@@ -37,7 +49,7 @@ st.sidebar.title("ITIM")
 years = st.sidebar.multiselect("Select specific years", df['Date'].dt.year.unique())
 if len(years) > 0:
     df = df[df['Date'].dt.year.isin(years)]
-    fig = px.pie(df, names='Invalid')
+    fig = px.pie(df, names='Invalid', title=f'Invalid data by {years}')
     fig.update_layout(uniformtext_minsize=12, uniformtext_mode='hide')
 st.sidebar.write("---")
 
@@ -45,10 +57,16 @@ st.sidebar.write("---")
 with st.container():
     col1, col2 = st.columns(2)
     with col1:
-        st.dataframe(df[['Id', 'Date', 'Invalid']])
+        st.plotly_chart(fig_freq)
     with col2:
         st.plotly_chart(fig)
     st.write("---")
+
+
+with st.container():
+    st.dataframe(df[['Id', 'Date', 'Invalid']])
+    st.write("---")
+
 
 
 
