@@ -64,9 +64,11 @@ with st.container():
 
 
 with st.container():
-    st.dataframe(df[['Id', 'Date', 'Invalid']])
+    df_analyt = df[['Id', 'Chlorine', 'Coliforms', 'pH', 'Pseudomonas',
+        'Turbidity', 'Staphylococcus']].copy().round(1)
+    df_analyt = df_analyt.sort_values(by=['Id'])
+    st.write(df_analyt)
     st.write("---")
-
 
 
 
