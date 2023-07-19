@@ -92,7 +92,6 @@ def calculate_freq_and_invalid_df(df):
 
 
 def mesurments_per_month(df):
-    print(df)
     df['Month_Year'] = df['Date'].dt.strftime('%m/%y')
     df['Month_Year'] = pd.to_datetime(df['Month_Year'], format='%m/%y')
     all_measurments_df = df.sort_values(by='Month_Year')
