@@ -1,31 +1,21 @@
 import pandas as pd
-import numpy as np
 import streamlit as st
 import plotly.express as px
+import data_process as dp
+import numpy as np
+
 
 st.set_page_config(page_title="ITIM", page_icon=":computer:", layout="wide")
-df = pd.read_csv("files_with_date.csv")
+df = pd.read_csv("files_with_date_dist.csv")
+df['Date'] = pd.to_datetime(df['Date'])
 df_freq = pd.read_csv("for_romy.csv")
-df_freq = df_freq.drop(columns=['Id'])
-df_freq[df_freq > 1] = 1
-zeros_count = df_freq.eq(0).sum().sum()
-ones_count = df_freq.eq(1).sum().sum()
-
-# Create a pie chart
-fig_freq = px.pie(
-    values=[zeros_count, ones_count],
-    names=['Not Sampled', 'Sampled'],
-    title='Monthly sampling frequency',
-)
-
 
 
 with st.container():
     st.title("Mikveh Data Analysis for ITIM")
     st.write("[ITIM](https://www.itim.org.il/) is the leading advocacy organization working to build a Jewish and democratic Israel in which all Jews can lead full Jewish lives.")
     st.write("On this Dashboard, we analyze data from the the Health Ministry montly Mikveh samples to help ITIM find the mikvaot that are not sampled enough or have invalid data.")
-    st.write("This project has been developed by the Data Science for Social Good program at the Hebrew University of Jerusalem.")
-    st.write("Project Members: Romy Bauch, Oshri Fatkiev, Gili Kurtser-Gilead, and Omer Kidron")
+
     # upload new csv file
     uploaded_file = st.file_uploader("Upload a new csv file to update the data.")
     if uploaded_file is not None:
@@ -35,22 +25,15 @@ with st.container():
     st.write("---")
 
 
-invalid = ((df['Chlorine'].lt(1.5) | df['Chlorine'].gt(3)) | (df['Coliforms'].gt(10)) |
-        (df['pH'].lt(7) | df['pH'].gt(8)) | (df['Pseudomonas'].gt(0)) |
-        df['Turbidity'].gt(1) | df['Staphylococcus'].gt(2))
-df['Invalid'] = invalid
-df['Date'] = pd.to_datetime(df['Date'])
-# make pie chart of invalid data
-fig = px.pie(df, names='Invalid', title='Invalid data by all years')
-# fig.update_traces(textposition='inside', textinfo='percent+label')
-fig.update_layout(uniformtext_minsize=12, uniformtext_mode='hide')
-
 st.sidebar.title("ITIM")
 years = st.sidebar.multiselect("Select specific years", df['Date'].dt.year.unique())
+sites = st.sidebar.multiselect("Select specific sites", df['Id'].unique())
 if len(years) > 0:
     df = df[df['Date'].dt.year.isin(years)]
-    fig = px.pie(df, names='Invalid', title=f'Invalid data by {years}')
-    fig.update_layout(uniformtext_minsize=12, uniformtext_mode='hide')
+if len(sites) > 0:
+    df = df[df['Id'].isin(sites)]
+fig_freq = dp.calculate_freq_pie_chart(df_freq, years)
+fig_invalid = dp.calculate_invalid_pie_chart(df, years)
 st.sidebar.write("---")
 
 
@@ -59,16 +42,198 @@ with st.container():
     with col1:
         st.plotly_chart(fig_freq)
     with col2:
-        st.plotly_chart(fig)
+        st.plotly_chart(fig_invalid)
     st.write("---")
+
+
+# third part
+# Define a dictionary with column names as keys and their respective allowed ranges as values
+column_ranges = {
+    'Chlorine': (1.5, 3),
+    'Coliforms': (0, 10),
+    'Pseudomonas': (0, 0),
+    'Staphylococcus': (0,2),
+    'Turbidity': (0, 1),
+    'pH': (7, 8)
+}
+
+# Define a function to apply background colors based on column-specific ranges
+
+def color_background(val, column_name):
+    if type(val) != str:
+        if column_name in column_ranges:
+            allowed_range = column_ranges[column_name]
+            if val < allowed_range[0] or val > allowed_range[1]:
+                return 'background-color: #f75040'
+            elif allowed_range[0] <= val <= allowed_range[1]:
+                return 'background-color: '
+        return 'background-color: '  # Default color for other values or unknown columns
+
+# Apply the styling function to the entire DataFrame using the Styler
+styled_df = df.style.apply(lambda x: [color_background(val, column_name) for val, column_name in zip(x, x.index)], axis=1)
+
+df_analyts = df.copy()
+df_analyts['Chlorine_invalid'] = df_analyts['Chlorine'].lt(1.5) | df_analyts['Chlorine'].gt(3)
+df_analyts['Coliforms_invalid'] = df_analyts['Coliforms'].gt(10)
+df_analyts['pH_invalid'] = df_analyts['pH'].lt(7) | df_analyts['pH'].gt(8)
+df_analyts['Pseudomonas_invalid'] = df_analyts['Pseudomonas'].gt(0)
+df_analyts['Turbidity_invalid'] = df_analyts['Turbidity'].gt(1)
+df_analyts['Staphylococcus_invalid'] = df_analyts['Staphylococcus'].gt(2)
+
+df_chart = df_analyts[['Chlorine_invalid', 'Coliforms_invalid', 'Chlorine', 'Coliforms',
+                       'pH_invalid', 'pH', 'Pseudomonas_invalid', 'Pseudomonas',
+                       'Turbidity_invalid', 'Turbidity', 'Staphylococcus_invalid', 'Staphylococcus']].copy()
+
+# Define the column names and corresponding conditions
+columns = ['Chlorine', 'Coliforms', 'pH', 'Pseudomonas', 'Turbidity', 'Staphylococcus']
+invalid_counts = []
+notnull_counts = []
+
+# Calculate counts for each column
+for column in columns:
+    invalid_count = df_chart[(df_chart[column + '_invalid'] == 1) & (~pd.isna(df_chart[column]))].shape[0]
+    notnull_count = df_chart[column].notna().sum()
+    invalid_counts.append(invalid_count)
+    notnull_counts.append(notnull_count)
+
+# Create a new DataFrame with the counts
+counts_df = pd.DataFrame({
+    'Analyt': columns,
+    'Invalid samples': invalid_counts,
+    'All samples': notnull_counts
+})
+
+# Create the grouped bar chart using Plotly Express
+fig_analyt = px.bar(counts_df, x='Analyt', y=['Invalid samples', 'All samples'], barmode='overlay')
+fig_analyt.update_layout(width=500)
+
+rows_per_page = 50
+current_page = st.session_state.get("current_page", 0)
+
+with st.container():
+    col1, col2 = st.columns(2)
+    with col1:
+        df_analyt = df[
+            ['Id', 'Chlorine', 'Coliforms', 'pH', 'Pseudomonas', 'Turbidity',
+             'Staphylococcus']].copy().round(1)
+        df_analyt = df_analyt.sort_values(by=['Id'])
+        df_analyt = df_analyt.fillna('Unchecked')
+        num_rows = len(df_analyt)
+
+        start_index = current_page * rows_per_page
+        end_index = min(start_index + rows_per_page, num_rows)
+
+        styled_df = df_analyt.iloc[start_index:end_index, :].style.apply(
+            lambda x: [color_background(val, column_name) for val, column_name
+                       in zip(x, x.index)], axis=1
+        )
+
+        st.dataframe(styled_df, hide_index=True)
+
+        if current_page > 0:
+            if st.button("Previous"):
+                current_page -= 1
+        if end_index < num_rows:
+            if st.button("Next"):
+                current_page += 1
+    with col2:
+        st.plotly_chart(fig_analyt)
+
+st.session_state["current_page"] = current_page
+
+# histogram fig clorine/ph:
+def create_fig_hist_2_bounderies(analyt ,l, b1, b2, u, r1, r2):
+    filtered_df = df[(df[analyt] != 0) & (~df[analyt].isna())]
+    filtered_df["color"] = np.select(
+        [filtered_df[analyt].lt(l), filtered_df[analyt].lt(b1),
+         filtered_df[analyt].lt(b2), filtered_df[analyt].lt(u)],
+        ["red", "orange", "green", "orange"],
+        "red",
+    )
+    fig_hist_analyt = px.histogram(filtered_df, x=analyt,
+                                   color='color',
+                                   # marginal='histogram',
+                                   barmode='overlay',
+                                   color_discrete_map={
+                                       "red":"red",
+                                       "orange": "orange",
+                                       "green": "green",
+                                   })
+    fig_hist_analyt.update_layout(
+        xaxis=dict(range=[r1, r2]),  # Set x-axis limit to 0-6
+        xaxis_tickmode='linear',
+        xaxis_dtick=0.2,  # Set tick intervals as 0.2
+        xaxis_tickformat='.1f',  # Set tick labels to 1 decimal place
+        title='Histogram of '+analyt+' values samples',
+        xaxis_title=analyt,
+        yaxis_title='Frequency',
+        bargap=0.2,  # Adjust gap between bars
+        showlegend=False
+    )
+    return fig_hist_analyt
+
+def create_fig_hist_1_bounderies(analyt ,l, b1, r1, r2):
+    filtered_df = df[(~df[analyt].isna())]
+    filtered_df["color"] = np.select(
+        [filtered_df[analyt].lt(l), filtered_df[analyt].lt(b1)],
+        ["green", "orange"],
+        "red",
+    )
+    fig_hist_analyt = px.histogram(filtered_df, x=analyt,
+                                   color='color',
+                                   # marginal='histogram',
+                                   barmode='overlay',
+                                   color_discrete_map={
+                                       "red":"red",
+                                       "orange": "orange",
+                                       "green": "green",
+                                   })
+    fig_hist_analyt.update_layout(
+        xaxis=dict(range=[r1, r2]),  # Set x-axis limit to 0-6
+        xaxis_tickmode='linear',
+        xaxis_dtick=1,  # Set tick intervals as 0.2
+        xaxis_tickformat='.1f',  # Set tick labels to 1 decimal place
+        title='Histogram of '+analyt+' values samples',
+        xaxis_title=analyt+" value",
+        yaxis_title='Frequency',
+        bargap=0.2,  # Adjust gap between bars
+        showlegend=False
+    )
+    return fig_hist_analyt
 
 
 with st.container():
-    df_analyt = df[['Id', 'Chlorine', 'Coliforms', 'pH', 'Pseudomonas',
-        'Turbidity', 'Staphylococcus']].copy().round(1)
-    df_analyt = df_analyt.sort_values(by=['Id'])
-    st.write(df_analyt)
+    selected_analyt = st.selectbox("Select an analyt", ['pH', 'Coliforms',
+                                                        'Chlorine',
+                                                        'Pseudomonas',
+                                                        'Staphylococcus',
+                                                        'Turbidity'])
+    if(selected_analyt == 'pH'):
+        st.plotly_chart(create_fig_hist_2_bounderies('pH', 7, 7.1, 7.9, 8, 5, 10))
+    if (selected_analyt == 'Chlorine'):
+        st.plotly_chart(
+            create_fig_hist_2_bounderies('Chlorine', 1.5, 1.6, 2.9, 3, 0, 5))
+    if(selected_analyt == 'Coliforms'):
+        st.plotly_chart(create_fig_hist_1_bounderies('Coliforms', 10, 10.1, 0, 15))
+    if(selected_analyt == 'Pseudomonas'):
+        st.plotly_chart(create_fig_hist_1_bounderies('Pseudomonas', 1, 1.1, 0, 10))
+    if (selected_analyt == 'Staphylococcus'):
+        st.plotly_chart(
+            create_fig_hist_1_bounderies('Staphylococcus', 2, 2.1, 0, 10))
+    if (selected_analyt == 'Turbidity'):
+        st.plotly_chart(
+            create_fig_hist_1_bounderies('Turbidity', 1, 1.1, 0, 10))
     st.write("---")
+
+
+
+
+
+
+
+with st.container():
+    st.write("This project has been developed by the [Data Science for Social Good](https://cidr.huji.ac.il/en/data-science-for-social-good/) program at the Hebrew University of Jerusalem.")
+    st.write("Project Members: Romy Bauch, Oshri Fatkiev, Gili Kurtser-Gilead, and Omer Kidron.")
 
 
 
