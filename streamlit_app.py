@@ -3,18 +3,17 @@ import streamlit as st
 import plotly.express as px
 import data_process as dp
 import numpy as np
-
+from streamlit_folium import st_folium
 
 st.set_page_config(page_title="ITIM", page_icon=":computer:", layout="wide")
 df = pd.read_csv("files_with_date_dist.csv")
 df['Date'] = pd.to_datetime(df['Date'])
-df_freq = pd.read_csv("for_romy.csv")
-
-
 with st.container():
     st.title("Mikveh Data Analysis for ITIM")
-    st.write("[ITIM](https://www.itim.org.il/) is the leading advocacy organization working to build a Jewish and democratic Israel in which all Jews can lead full Jewish lives.")
-    st.write("On this Dashboard, we analyze data from the the Health Ministry montly Mikveh samples to help ITIM find the mikvaot that are not sampled enough or have invalid data.")
+    st.write(
+        "[ITIM](https://www.itim.org.il/) is the leading advocacy organization working to build a Jewish and democratic Israel in which all Jews can lead full Jewish lives.")
+    st.write(
+        "On this Dashboard, we analyze data from the the Health Ministry montly Mikveh samples to help ITIM find the mikvaot that are not sampled enough or have invalid data.")
 
     # upload new csv file
     uploaded_file = st.file_uploader("Upload a new csv file to update the data.")
@@ -24,18 +23,31 @@ with st.container():
         st.write("Data uploaded successfully!")
     st.write("---")
 
-
 st.sidebar.title("ITIM")
+# Initialize years and sites with default values if they are not already set in session_state
+rows_per_page = 50
+current_page = st.session_state.get("current_page", 0)
+st.session_state.years = st.session_state.get("years", [])
+st.session_state.sites = st.session_state.get("sites", [])
+
 years = st.sidebar.multiselect("Select specific years", df['Date'].dt.year.unique())
 sites = st.sidebar.multiselect("Select specific sites", df['Id'].unique())
+
+# Check if the selections have changed, and reset the current_page to 0 if they have
+if st.session_state.years != years or st.session_state.sites != sites:
+    current_page = 0
+
+# Update session_state with the current selections
+st.session_state.years = years
+st.session_state.sites = sites
 if len(years) > 0:
     df = df[df['Date'].dt.year.isin(years)]
 if len(sites) > 0:
     df = df[df['Id'].isin(sites)]
+df_freq = dp.mesurments_per_month(df)
 fig_freq = dp.calculate_freq_pie_chart(df_freq, years)
 fig_invalid = dp.calculate_invalid_pie_chart(df, years)
 st.sidebar.write("---")
-
 
 with st.container():
     col1, col2 = st.columns(2)
@@ -45,6 +57,24 @@ with st.container():
         st.plotly_chart(fig_invalid)
     st.write("---")
 
+with st.container():
+    selected_map = st.selectbox("Select map type", ['Frequency', 'Validity'])
+    col1, col2 = st.columns(2)
+    with col1:
+        try:
+            if selected_map == 'Frequency':
+                site_map = dp.create_map_freq(df)
+            else:
+                site_map = dp.create_map_invalid(df)
+            st_folium(site_map, width=400, height=500)
+        except:
+            st.write("Not enough sites for this selection. Please add more if you want to see the map.")
+    with col2:
+        selected_df = dp.calculate_freq_and_invalid_df(df)
+        # show only the relevant columns
+        selected_df = selected_df[['Id', selected_map]]
+        st.dataframe(selected_df, hide_index=True, height=500)
+    st.write("---")
 
 # third part
 # Define a dictionary with column names as keys and their respective allowed ranges as values
@@ -52,10 +82,11 @@ column_ranges = {
     'Chlorine': (1.5, 3),
     'Coliforms': (0, 10),
     'Pseudomonas': (0, 0),
-    'Staphylococcus': (0,2),
+    'Staphylococcus': (0, 2),
     'Turbidity': (0, 1),
     'pH': (7, 8)
 }
+
 
 # Define a function to apply background colors based on column-specific ranges
 
@@ -69,8 +100,10 @@ def color_background(val, column_name):
                 return 'background-color: '
         return 'background-color: '  # Default color for other values or unknown columns
 
+
 # Apply the styling function to the entire DataFrame using the Styler
-styled_df = df.style.apply(lambda x: [color_background(val, column_name) for val, column_name in zip(x, x.index)], axis=1)
+styled_df = df.style.apply(lambda x: [color_background(val, column_name) for val, column_name in zip(x, x.index)],
+                           axis=1)
 
 df_analyts = df.copy()
 df_analyts['Chlorine_invalid'] = df_analyts['Chlorine'].lt(1.5) | df_analyts['Chlorine'].gt(3)
@@ -107,8 +140,8 @@ counts_df = pd.DataFrame({
 fig_analyt = px.bar(counts_df, x='Analyt', y=['Invalid samples', 'All samples'], barmode='overlay')
 fig_analyt.update_layout(width=500)
 
-rows_per_page = 50
-current_page = st.session_state.get("current_page", 0)
+# rows_per_page = 50
+# current_page = st.session_state.get("current_page", 0)
 
 with st.container():
     col1, col2 = st.columns(2)
@@ -128,7 +161,7 @@ with st.container():
                        in zip(x, x.index)], axis=1
         )
 
-        st.dataframe(styled_df, hide_index=True)
+        st.dataframe(styled_df.format(na_rep='Unchecked', precision=1), hide_index=True)
 
         if current_page > 0:
             if st.button("Previous"):
@@ -141,8 +174,9 @@ with st.container():
 
 st.session_state["current_page"] = current_page
 
+
 # histogram fig clorine/ph:
-def create_fig_hist_2_bounderies(analyt ,l, b1, b2, u, r1, r2):
+def create_fig_hist_2_bounderies(analyt, l, b1, b2, u, r1, r2):
     filtered_df = df[(df[analyt] != 0) & (~df[analyt].isna())]
     filtered_df["color"] = np.select(
         [filtered_df[analyt].lt(l), filtered_df[analyt].lt(b1),
@@ -155,16 +189,16 @@ def create_fig_hist_2_bounderies(analyt ,l, b1, b2, u, r1, r2):
                                    # marginal='histogram',
                                    barmode='overlay',
                                    color_discrete_map={
-                                       "red":"red",
+                                       "red": "red",
                                        "orange": "orange",
                                        "green": "green",
                                    })
     fig_hist_analyt.update_layout(
         xaxis=dict(range=[r1, r2]),  # Set x-axis limit to 0-6
         xaxis_tickmode='linear',
-        xaxis_dtick=0.2,  # Set tick intervals as 0.2
+        xaxis_dtick=0.1,  # Set tick intervals as 0.2
         xaxis_tickformat='.1f',  # Set tick labels to 1 decimal place
-        title='Histogram of '+analyt+' values samples',
+        title='Histogram of ' + analyt + ' values samples',
         xaxis_title=analyt,
         yaxis_title='Frequency',
         bargap=0.2,  # Adjust gap between bars
@@ -172,7 +206,8 @@ def create_fig_hist_2_bounderies(analyt ,l, b1, b2, u, r1, r2):
     )
     return fig_hist_analyt
 
-def create_fig_hist_1_bounderies(analyt ,l, b1, r1, r2):
+
+def create_fig_hist_1_bounderies(analyt, l, b1, r1, r2):
     filtered_df = df[(~df[analyt].isna())]
     filtered_df["color"] = np.select(
         [filtered_df[analyt].lt(l), filtered_df[analyt].lt(b1)],
@@ -184,20 +219,22 @@ def create_fig_hist_1_bounderies(analyt ,l, b1, r1, r2):
                                    # marginal='histogram',
                                    barmode='overlay',
                                    color_discrete_map={
-                                       "red":"red",
+                                       "red": "red",
                                        "orange": "orange",
                                        "green": "green",
                                    })
     fig_hist_analyt.update_layout(
-        xaxis=dict(range=[r1, r2]),  # Set x-axis limit to 0-6
+        xaxis=dict(range=[r1, r2]),  # Set x-axis limit to r1-r2
         xaxis_tickmode='linear',
-        xaxis_dtick=1,  # Set tick intervals as 0.2
+        xaxis_dtick=0.1,  # Set tick intervals as 0.1
         xaxis_tickformat='.1f',  # Set tick labels to 1 decimal place
-        title='Histogram of '+analyt+' values samples',
-        xaxis_title=analyt+" value",
+        title='Histogram of ' + analyt + ' values samples',
+        xaxis_title=analyt,
         yaxis_title='Frequency',
-        bargap=0.2,  # Adjust gap between bars
-        showlegend=False
+        bargap=0.1,  # Adjust gap between bars
+        showlegend=False,
+        barmode='overlay',  # Set the barmode to overlay
+        autosize=False
     )
     return fig_hist_analyt
 
@@ -208,14 +245,14 @@ with st.container():
                                                         'Pseudomonas',
                                                         'Staphylococcus',
                                                         'Turbidity'])
-    if(selected_analyt == 'pH'):
+    if (selected_analyt == 'pH'):
         st.plotly_chart(create_fig_hist_2_bounderies('pH', 7, 7.1, 7.9, 8, 5, 10))
     if (selected_analyt == 'Chlorine'):
         st.plotly_chart(
             create_fig_hist_2_bounderies('Chlorine', 1.5, 1.6, 2.9, 3, 0, 5))
-    if(selected_analyt == 'Coliforms'):
+    if (selected_analyt == 'Coliforms'):
         st.plotly_chart(create_fig_hist_1_bounderies('Coliforms', 10, 10.1, 0, 15))
-    if(selected_analyt == 'Pseudomonas'):
+    if (selected_analyt == 'Pseudomonas'):
         st.plotly_chart(create_fig_hist_1_bounderies('Pseudomonas', 1, 1.1, 0, 10))
     if (selected_analyt == 'Staphylococcus'):
         st.plotly_chart(
@@ -225,17 +262,7 @@ with st.container():
             create_fig_hist_1_bounderies('Turbidity', 1, 1.1, 0, 10))
     st.write("---")
 
-
-
-
-
-
-
 with st.container():
-    st.write("This project has been developed by the [Data Science for Social Good](https://cidr.huji.ac.il/en/data-science-for-social-good/) program at the Hebrew University of Jerusalem.")
+    st.write(
+        "This project has been developed by the [Data Science for Social Good](https://cidr.huji.ac.il/en/data-science-for-social-good/) program at the Hebrew University of Jerusalem.")
     st.write("Project Members: Romy Bauch, Oshri Fatkiev, Gili Kurtser-Gilead, and Omer Kidron.")
-
-
-
-
-
