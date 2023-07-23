@@ -6,7 +6,7 @@ import numpy as np
 from streamlit_folium import st_folium
 
 st.set_page_config(page_title="ITIM", page_icon=":computer:", layout="wide")
-df = pd.read_csv("files_with_date_dist.csv")
+df = pd.read_csv("data_to_dashboard.csv")
 df['Date'] = pd.to_datetime(df['Date'])
 with st.container():
     st.title("Mikveh Data Analysis for ITIM")
@@ -31,7 +31,8 @@ st.session_state.years = st.session_state.get("years", [])
 st.session_state.sites = st.session_state.get("sites", [])
 
 years = st.sidebar.multiselect("Select specific years", df['Date'].dt.year.unique())
-sites = st.sidebar.multiselect("Select specific sites", df['Id'].unique())
+cities = st.sidebar.multiselect("Select specific cities", df['Settlement'].unique())
+sites = st.sidebar.multiselect("Select specific Mikveh code", df['Id'].unique())
 
 # Check if the selections have changed, and reset the current_page to 0 if they have
 if st.session_state.years != years or st.session_state.sites != sites:
@@ -44,6 +45,8 @@ if len(years) > 0:
     df = df[df['Date'].dt.year.isin(years)]
 if len(sites) > 0:
     df = df[df['Id'].isin(sites)]
+if len(cities) > 0:
+    df = df[df['Settlement'].isin(cities)]
 df_freq = dp.mesurments_per_month(df)
 fig_freq = dp.calculate_freq_pie_chart(df_freq, years)
 fig_invalid = dp.calculate_invalid_pie_chart(df, years)
@@ -72,7 +75,7 @@ with st.container():
     with col2:
         selected_df = dp.calculate_freq_and_invalid_df(df)
         # show only the relevant columns
-        selected_df = selected_df[['Id', selected_map]]
+        # selected_df = selected_df[['Id', selected_map]]
         st.dataframe(selected_df, hide_index=True, height=500)
     st.write("---")
 
@@ -262,7 +265,56 @@ with st.container():
             create_fig_hist_1_bounderies('Turbidity', 1, 1.1, 0, 10))
     st.write("---")
 
+
+def check_invalid(row):
+    return 1 if row.any() else 0
+
+# Add the 'is_invalid' column
+df_analyts['is_invalid'] = df_analyts[['Chlorine_invalid', 'Coliforms_invalid',
+                                       'pH_invalid','Pseudomonas_invalid',
+                                       'Turbidity_invalid',
+                                       'Staphylococcus_invalid']].apply(check_invalid, axis=1)
+
+# Extract the year and month from the 'Date' column
+df_analyts['Year'] = df_analyts['Date'].dt.year
+df_analyts['Month'] = df_analyts['Date'].dt.month
+
+# Group by Year and Month to get the counts for each combination
+year_month_counts = df_analyts.groupby(['Year', 'Month']).agg(
+    number_of_samples=('is_invalid', 'count'),
+    num_of_unvalid_samples=('is_invalid', 'sum')
+).reset_index()
+# Creating a new 'date' column from 'Year' and 'Month'
+year_month_counts['date'] = pd.to_datetime(year_month_counts[['Year', 'Month']]
+                                           .assign(day=1))
+fig_invalid_date = px.bar(year_month_counts, x='date',
+                          y=['num_of_unvalid_samples','number_of_samples'],
+                          barmode='overlay')
+
+fig_invalid_date.update_layout(yaxis_title='number of samples')
+fig_invalid_date.update_layout(width=1000)
+fig_invalid_date.update_layout(xaxis_tickangle = -45)
+
+with st.container():
+    st.plotly_chart(fig_invalid_date)
+
+district_counts = df_analyts.groupby(['district']).agg(
+    number_of_samples=('is_invalid', 'count'),
+    num_of_unvalid_samples=('is_invalid', 'sum')).reset_index()
+
+fig_invalid_district = px.bar(district_counts, x='district',
+                          y=['num_of_unvalid_samples', 'number_of_samples'],
+                          barmode='overlay')
+
+# Rotate x-axis labels for better visibility
+fig_invalid_district.update_layout(xaxis_tickangle=-45)
+
+# Display the figure in Streamlit
+with st.container():
+    st.plotly_chart(fig_invalid_district)
+
+
 with st.container():
     st.write(
-        "This project has been developed by the [Data Science for Social Good](https://cidr.huji.ac.il/en/data-science-for-social-good/) program at the Hebrew University of Jerusalem.")
-    st.write("Project Members: Romy Bauch, Oshri Fatkiev, Gili Kurtser-Gilead, and Omer Kidron.")
+        "This project has been developed as part of the [Data Science for Social Good](https://cidr.huji.ac.il/en/data-science-for-social-good/) program at the Hebrew University of Jerusalem.")
+    st.write("Project members: Romy Bauch, Oshri Fatkiev, Gili Kurtser-Gilead, and Omer Kidron.")
