@@ -63,6 +63,7 @@ with st.container():
     st.write("---")
 
 with st.container():
+    st.write("This map can be changed using the 'Select Map Type' button, and it displays the percentage, indicated by colors, for each Mikveh based on the frequency of sample taking and the validity of the samples collected. In the table next to the map, you can view the Mikveh ID, its settlement, as well as the frequency and validation percentages.")
     selected_map = st.selectbox("Select map type", ['Frequency', 'Validity'])
     col1, col2 = st.columns(2)
     with col1:
@@ -174,8 +175,10 @@ with st.container():
         if end_index < num_rows:
             if st.button("Next"):
                 current_page += 1
+        st.write("This table presents the Mikveh ID and sample dates, along with the measurement values for all analyts collected in each sample")
     with col2:
         st.plotly_chart(fig_analyt)
+        st.write("This graph displays the number of invalid samples for each analyt, relative to the total number of samples they have taken.")
 
 st.session_state["current_page"] = current_page
 

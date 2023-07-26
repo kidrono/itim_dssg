@@ -6,6 +6,9 @@ import mapclassify
 from shapely.geometry import Point
 import plotly.express as px
 
+good_color = '#1A85FF'
+bad_color = '#D41159'
+
 
 def calculate_freq_pie_chart(df, years=None):
     # df = df.drop(columns=['Id'])
@@ -19,13 +22,13 @@ def calculate_freq_pie_chart(df, years=None):
             names=['Not Sampled', 'Sampled'],
             title=f'Monthly sampling frequency by {years}',
             color=['Not Sampled', 'Sampled'],
-            color_discrete_map={'Not Sampled': 'red', 'Sampled': 'blue'})
+            color_discrete_map={'Not Sampled': bad_color, 'Sampled': good_color})
     else:
         fig_freq = px.pie(
             values=[zeros_count, ones_count],
             names=['Not Sampled', 'Sampled'],
             color=['Not Sampled', 'Sampled'],
-            color_discrete_map={'Not Sampled': 'red', 'Sampled': 'blue'},
+            color_discrete_map={'Not Sampled': bad_color, 'Sampled': good_color},
             title='Monthly sampling frequency by all years')
     fig_freq.update_layout(autosize=False, width=450, height=450)
     return fig_freq
@@ -45,14 +48,14 @@ def calculate_invalid_pie_chart(df, years=None):
             names=['Invalid', 'Valid'],
             title=f'Invalid tests by {years}',
             color=['Invalid', 'Valid'],
-            color_discrete_map={'Invalid': 'red', 'Valid': 'blue'})
+            color_discrete_map={'Invalid': bad_color, 'Valid': good_color})
     else:
         fig_invalid = px.pie(
             values=[true_count, false_count],
             names=['Invalid', 'Valid'],
             title='Invalid tests by all years',
             color=['Invalid', 'Valid'],
-            color_discrete_map={'Invalid': 'red', 'Valid': 'blue'},
+            color_discrete_map={'Invalid': bad_color, 'Valid': good_color},
         )
     # show the pie chart in the center of the screen
     fig_invalid.update_layout(autosize=False, width=450, height=450)
