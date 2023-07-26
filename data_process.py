@@ -6,8 +6,8 @@ import mapclassify
 from shapely.geometry import Point
 import plotly.express as px
 
-good_color = '#1A85FF'
-bad_color = '#D41159'
+good_color = '#8ecda1'
+bad_color = '#b32d18'
 
 
 def calculate_freq_pie_chart(df, years=None):

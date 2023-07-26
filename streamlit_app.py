@@ -179,6 +179,7 @@ with st.container():
     with col2:
         st.plotly_chart(fig_analyt)
         st.write("This graph displays the number of invalid samples for each analyt, relative to the total number of samples they have taken.")
+    st.write("---")
 
 st.session_state["current_page"] = current_page
 
@@ -197,9 +198,9 @@ def create_fig_hist_2_bounderies(analyt, l, b1, b2, u, r1, r2):
                                    # marginal='histogram',
                                    barmode='overlay',
                                    color_discrete_map={
-                                       "red": "red",
-                                       "orange": "orange",
-                                       "green": "green",
+                                       "red": "#e34f0c",
+                                       "orange": "#e08f00",
+                                       "green": "#07ad57",
                                    })
     fig_hist_analyt.update_layout(
         xaxis=dict(range=[r1, r2]),  # Set x-axis limit to 0-6
@@ -248,6 +249,7 @@ def create_fig_hist_1_bounderies(analyt, l, b1, r1, r2):
 
 
 with st.container():
+    st.write("This graph is dynamic and can be customized based on the chosen analyte. The red area representing the invalid samples, the orange area representing the borderline samples, and the green area representing the valid samples.")
     selected_analyt = st.selectbox("Select an analyt", ['pH', 'Coliforms',
                                                         'Chlorine',
                                                         'Pseudomonas',
@@ -301,6 +303,7 @@ fig_invalid_date.update_layout(width=1000)
 fig_invalid_date.update_layout(xaxis_tickangle = -45)
 
 with st.container():
+    st.write("This graph shows the number of invalid samples from all the samples that have been taken over **time**, categorized by months and years.")
     st.plotly_chart(fig_invalid_date)
 
 district_counts = df_analyts.groupby(['district']).agg(
