@@ -56,8 +56,10 @@ with st.container():
     col1, col2 = st.columns(2)
     with col1:
         st.plotly_chart(fig_freq)
+        st.write("The pie chart shows the percentage of sites that were sampled in each month. Each site should be sampled at least once a month.")
     with col2:
         st.plotly_chart(fig_invalid)
+        st.write("The pie chart shows the percentage of sites that were invalid in each month. Invalid means that one or more of the parameters were out of range.")
     st.write("---")
 
 with st.container():

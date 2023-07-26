@@ -17,12 +17,17 @@ def calculate_freq_pie_chart(df, years=None):
         fig_freq = px.pie(
             values=[zeros_count, ones_count],
             names=['Not Sampled', 'Sampled'],
-            title=f'Monthly sampling frequency by {years}')
+            title=f'Monthly sampling frequency by {years}',
+            color=['Not Sampled', 'Sampled'],
+            color_discrete_map={'Not Sampled': 'red', 'Sampled': 'blue'})
     else:
         fig_freq = px.pie(
             values=[zeros_count, ones_count],
             names=['Not Sampled', 'Sampled'],
+            color=['Not Sampled', 'Sampled'],
+            color_discrete_map={'Not Sampled': 'red', 'Sampled': 'blue'},
             title='Monthly sampling frequency by all years')
+    fig_freq.update_layout(autosize=False, width=450, height=450)
     return fig_freq
 
 
@@ -31,13 +36,27 @@ def calculate_invalid_pie_chart(df, years=None):
                (df['pH'].lt(7) | df['pH'].gt(8)) | (df['Pseudomonas'].gt(0)) |
                df['Turbidity'].gt(1) | df['Staphylococcus'].gt(2))
     df['Invalid'] = invalid
+    true_count = df['Invalid'].sum()
+    false_count = df['Invalid'].count() - true_count
     # make pie chart of invalid data
     if len(years) > 0:
-        fig = px.pie(df, names='Invalid', title=f'Invalid data by {years}')
+        fig_invalid = px.pie(
+            values=[true_count, false_count],
+            names=['Invalid', 'Valid'],
+            title=f'Invalid tests by {years}',
+            color=['Invalid', 'Valid'],
+            color_discrete_map={'Invalid': 'red', 'Valid': 'blue'})
     else:
-        fig = px.pie(df, names='Invalid', title='Invalid data by all years')
-    fig.update_layout(uniformtext_minsize=12, uniformtext_mode='hide')
-    return fig
+        fig_invalid = px.pie(
+            values=[true_count, false_count],
+            names=['Invalid', 'Valid'],
+            title='Invalid tests by all years',
+            color=['Invalid', 'Valid'],
+            color_discrete_map={'Invalid': 'red', 'Valid': 'blue'},
+        )
+    # show the pie chart in the center of the screen
+    fig_invalid.update_layout(autosize=False, width=450, height=450)
+    return fig_invalid
 
 
 def calculate_freq_and_invalid_df(df):
@@ -84,7 +103,7 @@ def calculate_freq_and_invalid_df(df):
     # Add the 'fraction_valid' column to the original DataFrame based on 'ID'
     df['Validity'] = df['Id'].map(id_count_dict)
     # The DataFrame to show in the dashboard
-    selected_columns = ['Id', 'Frequency', 'Validity']
+    selected_columns = ['Id', 'Settlement', 'Frequency', 'Validity']
     display_df = df[selected_columns].copy()
     display_df = display_df.drop_duplicates()
     display_df = display_df.reset_index(drop=True)
