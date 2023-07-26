@@ -303,8 +303,9 @@ fig_invalid_date.update_layout(width=1000)
 fig_invalid_date.update_layout(xaxis_tickangle = -45)
 
 with st.container():
-    st.write("This graph shows the number of invalid samples from all the samples that have been taken over **time**, categorized by months and years.")
     st.plotly_chart(fig_invalid_date)
+    st.write("This graph shows the number of invalid samples from all the samples that have been taken over **time**, categorized by months and years.")
+    st.write("---")
 
 district_counts = df_analyts.groupby(['district']).agg(
     number_of_samples=('is_invalid', 'count'),
@@ -320,6 +321,8 @@ fig_invalid_district.update_layout(xaxis_tickangle=-45)
 # Display the figure in Streamlit
 with st.container():
     st.plotly_chart(fig_invalid_district)
+    st.write("This graph presents the number of invalid samples categorized by different **districts** from all the samples collected.")
+    st.write("---")
 
 
 with st.container():
